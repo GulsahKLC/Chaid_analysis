@@ -1,6 +1,6 @@
 ---
 title: "R Notebook"
-output:
+output: Gulsah_kilic
   word_document: default
   html_notebook: default
   html_document:
@@ -221,14 +221,9 @@ df_clean$Air_Quality <- factor(df_clean$Air_Quality)
 # Yeni veri setinin yapısını kontrol etme
 str(df_clean)
 
-
-
 ```
 
 
-
-
-Veriyi Eğitim ve Test Setlerine Ayırın
 ## a.Veri setini %80 eğitim ve %20 test verisi olacak şekilde rastgele ayırın.
 ```{r}
 # Eğitim ve test setlerini rastgele ayırma (80% eğitim, 20% test)
@@ -243,9 +238,11 @@ test_set <- df_clean[-train_index, ]
 ## a. CHAID algoritmalarına ilişkin sonuçları karşılaştırarak yorumlayınız.
 ## d. Karar ağaçlarını oluşturunuz. Hedef değişkeni etkileyen en önemli özellikleri belirleyiniz.
 
-CHAID paketi R'de doğrudan kullanılabilir olmayabilir, çünkü R reposunda yaygın bir paket değildir. Ancak, benzer işlevsellik sağlayan başka paketler ve alternatifler de mevcuttur.
+CHAID paketi R'de doğrudan kullanılabilir olmayabilir, çünkü R reposunda yaygın bir paket değildir. Ancak, benzer işlevsellik
+ sağlayan başka paketler ve alternatifler de mevcuttur.
 
-Bir alternatif olarak, party paketiyle CHAID benzeri karar ağacı modelleri oluşturabilirsiniz. party paketi, ctree() fonksiyonu kullanarak karar ağacı oluşturmanızı sağlar ve verilerdeki bağımsız değişkenlerin etkileşimlerini incelemenize olanak tanır.
+Bir alternatif olarak, party paketiyle CHAID benzeri karar ağacı modelleri oluşturabilirsiniz. party paketi, ctree() 
+fonksiyonu kullanarak karar ağacı oluşturmanızı sağlar ve verilerdeki bağımsız değişkenlerin etkileşimlerini incelemenize olanak tanır.
 ```{r}
 # Gerekli paketleri yükleyin
 # install.packages("CHAID")
@@ -265,7 +262,8 @@ plot(model)
 ```
 
 
-## e. Ağaçların dallarını inceleyerek, hangi özelliklerin hava kalitesi üzerinde daha fazla etkili olduğunu yorumlayın. Hangi indeksleri kullandınız vb. gibi detayları da belirtiniz.
+## e. Ağaçların dallarını inceleyerek, hangi özelliklerin hava kalitesi üzerinde daha fazla etkili olduğunu yorumlayın. 
+Hangi indeksleri kullandınız vb. gibi detayları da belirtiniz.
 karar ağacına bakarak CHAID (Chi-squared Automatic Interaction Detection) 
 analizine göre CO (Karbon Monoksit) değeri, bu veri seti için en önemli 
 özellik olarak belirlenmiş görünüyor. CHAID analizleri, bağımsız değişkenler 
