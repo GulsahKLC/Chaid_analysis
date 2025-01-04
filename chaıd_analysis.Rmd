@@ -6,7 +6,7 @@ output:
   html_document:
     df_print: paged
 ---
-# ÖDEV 2 – VERİ MADENCİLİĞİ TEKNİKLERİ İLE CHAID UYGULAMASI
+#  CHAID UYGULAMASI
 ## Veri seti: Hava Kalitesi ve Kirlilik Değerlendirmesi Veri Seti:
 https://www.kaggle.com/datasets/mujtabamatin/air-quality-and-pollution-assessment/data
 
