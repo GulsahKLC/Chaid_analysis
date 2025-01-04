@@ -1,0 +1,321 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+# ÖDEV 2 – VERİ MADENCİLİĞİ TEKNİKLERİ İLE CHAID UYGULAMASI
+## Veri seti: Hava Kalitesi ve Kirlilik Değerlendirmesi Veri Seti:
+https://www.kaggle.com/datasets/mujtabamatin/air-quality-and-pollution-assessment/data
+
+## 2. Veriyi Eğitim ve Test Setlerine Ayırın
+
+#### a.Veri setini %80 eğitim ve %20 test verisi olacak şekilde rastgele ayırın.
+
+## 3. Karar ağacı algoritmalarından CHAID algoritmalarını kullanarak model oluşturunuz.  
+
+#### a. CHAID algoritmalarına ilişkin sonuçları karşılaştırarak yorumlayınız.
+#### b. Her bir değişken için alan bilgisi kullanarak kategoriler tanımlayın (örneğin: sıcaklık için düşük, orta, yüksek; PM2.5 için düşük kirli, orta kirli, çok kirli). Alan bilgisi gerektirdiğinden, bu tür eşik değerlerin nereden alındığını (örneğin, bilimsel raporlar veya çevre standartları) belirtiniz.
+#### c. Bu eşik değerleri kullanarak yeni kategoriler oluşturunuz.
+#### d. Karar ağaçlarını oluşturunuz. Hedef değişkeni etkileyen en önemli özellikleri belirleyiniz.
+#### e. Ağaçların dallarını inceleyerek, hangi özelliklerin hava kalitesi üzerinde daha fazla etkili olduğunu yorumlayın. Hangi indeksleri kullandınız vb. gibi detayları da belirtiniz.
+
+Çalışma dizinini belirleyelim ve mevcut dizini kontrol edelim:
+```{r}
+setwd("C:/IVM-ODEV/")
+getwd()
+```
+Bellek ve ekranı temizleyelim:
+```{r}
+graphics.off() # ekranı temizleyelim
+rm(list=ls()) # bellegi temizleyelim
+```
+Gerekli kütüphaneleri yükleyelim :
+```{r}
+#install.packages("tidyverse")
+library(tidyverse)  # Veri manipülasyonu ve görselleştirme için
+library(readr)      # Veri okuma
+
+```
+```{r}
+data <- read.csv("updated_pollution_dataset.csv")
+```
+```{r}
+str(data)
+```
+```{r}
+summary(data)
+```
+Eksik değerleri ele alalım.
+Varsa eksik değerleri median değerleri ile dolduralım.
+```{r}
+# Eksik verilerin sayısını kontrol edelim
+colSums(is.na(data))
+
+# Eksik verileri median ile dolduralım (sayısal veri için)
+data$PM2.5[is.na(data$PM2.5)] <- median(data$PM2.5, na.rm = TRUE)
+data$PM10[is.na(data$PM10)] <- median(data$PM10, na.rm = TRUE)
+data$NO2[is.na(data$NO2)] <- median(data$NO2, na.rm = TRUE)
+data$SO2[is.na(data$SO2)] <- median(data$SO2, na.rm = TRUE)
+data$CO[is.na(data$CO)] <- median(data$CO, na.rm = TRUE)
+data$Population_Density[is.na(data$Population_Density)] <- median(data$Population_Density, na.rm = TRUE)
+
+# Eksik verileri kategorik değişkenler için mod ile doldurabiliriz (örneğin, Temperature, Humidity)
+data$Temperature[is.na(data$Temperature)] <- "D"
+data$Humidity[is.na(data$Humidity)] <- "Normal"
+data$Air_Quality[is.na(data$Air_Quality)] <- "Good"
+
+```
+```{r}
+sum(is.na(data))
+```
+
+## b. Her bir değişken için alan bilgisi kullanarak kategoriler tanımlayın (örneğin: sıcaklık için düşük, orta, yüksek; PM2.5 için düşük kirli, orta kirli, çok kirli). Alan bilgisi gerektirdiğinden, bu tür eşik değerlerin nereden alındığını (örneğin, bilimsel raporlar veya çevre standartları) belirtiniz.
+## c. Bu eşik değerleri kullanarak yeni kategoriler oluşturunuz.
+Çıktıdan görüldüğü gibi 
+Air_Quality : karakter tipinde iken 
+Temperature, Humidity, PM2.5, PM10, NO2, SO2, CO,Proximity_to_Industrial_Areas, Population_Density  sayısal niteliklerdir. 
+
+sıcaklık (temperature)
+[29.00, →) Yüksek(Y)
+[13.40, 29.00) Normal(N)
+[←, 13.40) Düşükk(D)
+```{r}
+df <- data
+# İlk olarak Temperature sütununu sayısal değere çeviriyoruz (eğer gerekliyse)
+# Temperature değerlerini kategorize etme
+df $Temperature[df$Temperature >= 29.00] <- "Y"  # 29 ve üstü 'Yüksek'
+df $Temperature[df$Temperature < 13.40] <- "D"  # 13.40'ın altı 'Düşük'
+df $Temperature[df$Temperature < 29.00 & df $Temperature >= 13.40] <- "N"  # 13.40 - 29 arası 'Normal'
+
+# Temperature'yi factor olarak ayarlama
+df $Temperature <- factor(df $Temperature, levels = c("Y", "N", "D"))
+
+# Kontrol
+str(df $Temperature)
+
+```
+
+Humidity  
+(80,→) Yüksek(NemY)
+(←, 80] Normal(NemN)
+```{r}
+# Humidity değerlerini kategorize etme
+df$Humidity[df$Humidity < 36] <- "D"  # 36'nın altı 'Düşük'
+df$Humidity[df$Humidity >= 36 & data$Humidity <= 70] <- "N"  # 36-70 arası 'Normal'
+df$Humidity[df$Humidity > 70] <- "Y"  # 70'in üstü 'Yüksek'
+
+# Humidity'yi factor olarak ayarlama
+df$Humidity <- factor(df$Humidity, levels = c("Y", "N", "D"))
+
+# Kontrol
+str(df$Humidity)
+# Yapıyı kontrol edelim
+str(df)
+
+```
+
+PM2.5 Haritası:
+[25, ∞) → Yüksek (PM2.5Y)
+[12, 25) → Orta (PM2.5O)
+(-∞, 12) → Düşük (PM2.5D)
+```{r}
+# PM2.5 Kategorize Etme
+df$PM2.5[df$PM2.5 >= 25] <- "PM2.5Y"  # Yüksek
+df$PM2.5[df$PM2.5 < 12] <- "PM2.5D"  # Düşük
+df$PM2.5[df$PM2.5 >= 12 & df$PM2.5 < 25] <- "PM2.5O"  # Orta
+df$PM2.5 <- factor(df$PM2.5, levels = c("PM2.5Y", "PM2.5O", "PM2.5D"))
+```
+
+PM10 Haritası:
+[35, ∞) → Yüksek   (PM10Y)
+[21.7, 35) → Orta  (PM10O)
+(-∞, 21.7) → Düşük (PM10D)
+```{r}
+# PM10 Kategorize Etme
+df$PM10[df$PM10 >= 35] <- "PM10Y"  # Yüksek
+df$PM10[df$PM10 < 21.7] <- "PM10D"  # Düşük
+df$PM10[df$PM10 >= 21.7 & df$PM10 < 35] <- "PM10O"  # Orta
+df$PM10 <- factor(df$PM10, levels = c("PM10Y", "PM10O", "PM10D"))
+
+```
+
+NO2 Haritası:
+[30, ∞) → Yüksek (NO2Y)
+[20, 30) → Orta (NO2O)
+(-∞, 20) → Düşük (NO2D)
+```{r}
+# NO2 Kategorize Etme
+df$NO2[df$NO2 >= 30] <- "NO2Y"  # Yüksek
+df$NO2[df$NO2 < 20] <- "NO2D"  # Düşük
+df$NO2[df$NO2 >= 20 & df$NO2 < 30] <- "NO2O"  # Orta
+df$NO2 <- factor(df$NO2, levels = c("NO2Y", "NO2O", "NO2D"))
+
+```
+
+SO2 Haritası:
+[32, ∞) → Yüksek (SO2Y)
+[25.3, 32) → Orta (SO2O)
+(-∞, 25.3) → Düşük (SO2D)
+```{r}
+
+# SO2 Kategorize Etme
+df$SO2[df$SO2 >= 32] <- "SO2Y"  # Yüksek
+df$SO2[df$SO2 < 25.3] <- "SO2D"  # Düşük
+df$SO2[df$SO2 >= 25.3 & df$SO2 < 32] <- "SO2O"  # Orta
+df$SO2 <- factor(df$SO2, levels = c("SO2Y", "SO2O", "SO2D"))
+
+```
+
+CO Haritası:
+[1.84, ∞) → Yüksek (COY)
+[  1.41, 1.84) → Orta (COO)
+(-∞,   1.41) → Düşük (COD)
+```{r}
+
+# CO Kategorize Etme
+df$CO[df$CO >= 1.84] <- "COY"  # Yüksek
+df$CO[df$CO < 1.41] <- "COD"  # Düşük
+df$CO[df$CO >= 1.41 & df$CO < 1.84] <- "COO"  # Orta
+df$CO <- factor(df$CO, levels = c("COY", "COO", "COD"))
+```
+
+Proximity_to_Industrial_Areas Haritası:
+[10, ∞) → Yüksek (IndustrialY)
+[5, 10) → Orta (IndustrialO)
+(-∞, 5) → Düşük (IndustrialD)
+```{r}
+# Sanayiye Yakınlık (Proximity_to_Industrial_Areas) Kategorize Etme
+df$Proximity_to_Industrial_Areas[df$Proximity_to_Industrial_Areas >= 10] <- "IndustrialY"  # Yüksek
+df$Proximity_to_Industrial_Areas[df$Proximity_to_Industrial_Areas < 5] <- "IndustrialD"  # Düşük
+df$Proximity_to_Industrial_Areas[df$Proximity_to_Industrial_Areas >= 5 & df$Proximity_to_Industrial_Areas < 10] <- "IndustrialO"  # Orta
+df$Proximity_to_Industrial_Areas <- factor(df$Proximity_to_Industrial_Areas, levels = c("IndustrialY", "IndustrialO", "IndustrialD"))
+
+```
+
+Population_Density Haritası:
+[600, ∞) → Yüksek (DensityY)
+[494, 600) → Orta (DensityO)
+(-∞, 494) → Düşük (DensityD)
+```{r}
+
+# Nüfus Yoğunluğu (Population_Density) Kategorize Etme
+df$Population_Density[df$Population_Density >= 600] <- "DensityY"  # Yüksek
+df$Population_Density[df$Population_Density < 494] <- "DensityD"  # Düşük
+df$Population_Density[df$Population_Density >= 494 & df$Population_Density < 600] <- "DensityO"  # Orta
+df$Population_Density <- factor(df$Population_Density, levels = c("DensityY", "DensityO", "DensityD"))
+```
+
+```{r}
+str(df)
+```
+```{r}
+# NA değerlerini kontrol etme
+sum(is.na(df))  # Veri setinde toplam kaç tane NA olduğunu gösterir
+
+# NA değerlerini içeren satırları çıkarma
+df_clean <- na.omit(df)
+df_clean$Air_Quality <- factor(df_clean$Air_Quality)
+# Yeni veri setinin yapısını kontrol etme
+str(df_clean)
+
+
+
+```
+
+
+
+
+Veriyi Eğitim ve Test Setlerine Ayırın
+## a.Veri setini %80 eğitim ve %20 test verisi olacak şekilde rastgele ayırın.
+```{r}
+# Eğitim ve test setlerini rastgele ayırma (80% eğitim, 20% test)
+set.seed(123) # Rastgelelikin tekrarlanabilir olmasını sağlar
+train_index <- sample(1:nrow(df_clean), size = 0.8 * nrow(df_clean))
+train_set <- df_clean[train_index, ]
+test_set <- df_clean[-train_index, ]
+
+```
+
+# 3. Karar ağacı algoritmalarından CHAID algoritmalarını kullanarak model oluşturunuz.  
+## a. CHAID algoritmalarına ilişkin sonuçları karşılaştırarak yorumlayınız.
+## d. Karar ağaçlarını oluşturunuz. Hedef değişkeni etkileyen en önemli özellikleri belirleyiniz.
+
+CHAID paketi R'de doğrudan kullanılabilir olmayabilir, çünkü R reposunda yaygın bir paket değildir. Ancak, benzer işlevsellik sağlayan başka paketler ve alternatifler de mevcuttur.
+
+Bir alternatif olarak, party paketiyle CHAID benzeri karar ağacı modelleri oluşturabilirsiniz. party paketi, ctree() fonksiyonu kullanarak karar ağacı oluşturmanızı sağlar ve verilerdeki bağımsız değişkenlerin etkileşimlerini incelemenize olanak tanır.
+```{r}
+# Gerekli paketleri yükleyin
+# install.packages("CHAID")
+# install.packages("party")
+library(CHAID)
+library(party)
+
+# Modeli oluşturun
+ model <- chaid(Air_Quality ~ ., data = train_set)
+# Örnek karar ağacı modeli oluşturma
+# model <- ctree(Air_Quality ~ ., data = train_set)
+
+# Modelin özetini inceleyin
+summary(model)
+plot(model)
+
+```
+
+
+## e. Ağaçların dallarını inceleyerek, hangi özelliklerin hava kalitesi üzerinde daha fazla etkili olduğunu yorumlayın. Hangi indeksleri kullandınız vb. gibi detayları da belirtiniz.
+karar ağacına bakarak CHAID (Chi-squared Automatic Interaction Detection) 
+analizine göre CO (Karbon Monoksit) değeri, bu veri seti için en önemli 
+özellik olarak belirlenmiş görünüyor. CHAID analizleri, bağımsız değişkenler 
+ile hedef değişken arasında güçlü bir ilişki olup olmadığını tespit etmek için
+ki-kare testi kullanır ve bu ilişkiyi baz alarak veri setini dallara ayırır.
+
+Karar ağacının yapısını inceleyerek, değişkenlerin önem derecelerini şu şekilde
+yorumlayabiliriz:
+
+1. CO (Karbon Monoksit) – En Önemli Değişken:
+CO ağacın en üstünde, yani kök düğümünde yer alıyor. Bu da CHAID analizinde 
+CO'nun hedef değişken (hava kalitesi) ile en güçlü ilişkiye sahip bağımsız 
+değişken olduğunu gösterir.
+CHAID analizinde kök düğümde bulunan değişken, bağımsız değişkenlerin en 
+önemlisidir çünkü modelin dallanması ilk olarak bu değişkene göre yapılmıştır.
+2. NO2 (Azot Dioksit) – İkinci Önemli Değişken:
+NO2 düğümü, CO'dan sonra gelen en önemli değişken olarak görünüyor. 
+CO seviyelerine göre dallar ayrıldıktan sonra, özellikle sol ve sağ 
+taraftaki dallarda NO2, veriyi daha da alt gruplara ayırıyor. Bu da NO2'nin 
+CO'dan sonraki en önemli bağımsız değişken olduğunu gösteriyor.
+3. Population_Density (Nüfus Yoğunluğu) – Üçüncü Önemli Değişken:
+Population_Density (Nüfus Yoğunluğu) değişkeni, hem NO2 ile hem de doğrudan 
+CO ile birlikte kullanılıyor. Bu, nüfus yoğunluğunun da hava kalitesini etkileyen
+önemli bir değişken olduğunu gösteriyor.
+4. SO2 (Kükürt Dioksit) – Dördüncü Önemli Değişken:
+SO2 değeri, CO'nun olduğu dallarda veriyi ayıran bir diğer faktör olarak ortaya
+çıkıyor. SO2'nin hem CO hem de NO2 seviyeleri ile bağlantılı olarak hava kalitesini 
+tahmin etmede önemli bir rol oynadığı anlaşılıyor.
+5. PM10 (Partikül Madde 10) – Beşinci Önemli Değişken:
+PM10 düğümü de özellikle sağ dalda önemli bir faktör olarak yer alıyor ve 
+hava kalitesine ilişkin tahminlerde etkili oluyor. PM10 değişkeni, dallardaki 
+veriyi alt gruplara ayırarak önemli bir katkıda bulunuyor.
+CHAID Analizine Göre Yorum:
+CHAID analizinde kök düğüm olarak yer alan CO, en önemli değişken olarak kabul 
+edilir, çünkü modelde veriyi ilk olarak ayıran değişken odur. CHAID, bu ayrımı 
+yaparken bağımsız değişkenler arasındaki ki-kare değerine göre hareket eder.
+
+Alt düğümlerdeki değişkenler (NO2, Population_Density, SO2, PM10) ise CO'dan 
+sonra önem sırasına göre veriyi bölmeye devam eden değişkenlerdir. Her bir düğüm,
+bağımsız değişkenin hedef değişken üzerinde daha fazla açıklayıcı güce sahip 
+olduğunu gösterir.
+
+Genel Sıralama:
+CO (Karbon Monoksit) – En önemli değişken, çünkü kök düğüm.
+NO2 (Azot Dioksit) – İkinci sırada yer alıyor, CO'dan sonraki en büyük bölme kriteri.
+Population_Density (Nüfus Yoğunluğu) – Hem CO hem NO2'nin altında gruplamalar yapıyor.
+SO2 (Kükürt Dioksit) – CO'nun olduğu gruplarda etkili.
+PM10 (Partikül Madde 10) – Sağ dalda daha küçük gruplamalar yaparak ayrıştırma 
+yapıyor.
+CHAID analizinde değişkenlerin önemini belirlemek için kullanılan bu dallanma 
+yapısına bakarak, her bir değişkenin hedef değişken üzerindeki etkisini ve veriyi
+ne kadar iyi ayırdığını anlayabiliriz. CO, en kritik değişken olarak modelin 
+performansını en çok artıran bileşen olarak belirlenmiştir.
